@@ -1369,8 +1369,7 @@
             addLog('เริ่มต้นการผจญภัยครั้งใหม่ของมิ้น!', 'text-emerald-300');
         }
 
-        async function saveToSheets() {
-            // บันทึกสำรองลงเครื่องเสมอ
+async function saveToSheets() {
             localStorage.setItem('mint_local_save_' + sheetConfig.playerId, JSON.stringify(player));
 
             if (!sheetConfig.url) {
@@ -1401,15 +1400,21 @@
                     }
                 };
 
-                await fetch(`${sheetConfig.url}?action=save&playerId=${encodeURIComponent(sheetConfig.playerId)}`, {
-                    method: 'POST',
-                    body: JSON.stringify(payload)
-                });
+                // ส่งข้อมูลผ่าน Query Parameter เพื่อหลีกเลี่ยงปัญหา CORS Redirect
+                const encodedData = encodeURIComponent(JSON.stringify(payload));
+                const saveUrl = `${sheetConfig.url}?action=save&playerId=${encodeURIComponent(sheetConfig.playerId)}&data=${encodedData}`;
 
-                showToast('☁️ บันทึกค่าพลังของมิ้นลง Google Sheets สำเร็จ!');
-                addLog('บันทึกข้อมูลลง Google Sheets เรียบร้อยแล้ว', 'text-blue-300');
+                const res = await fetch(saveUrl);
+                const result = await res.json();
+
+                if (result.status === 'saved') {
+                    showToast('☁️ บันทึกค่าพลังของมิ้นลง Google Sheets สำเร็จ!');
+                    addLog('บันทึกข้อมูลลง Google Sheets เรียบร้อยแล้ว', 'text-blue-300');
+                } else {
+                    throw new Error('Save failed');
+                }
             } catch (err) {
-                showToast('❌ บันทึกลงชีตไม่สำเร็จ กรุณาตรวจสอบลิงก์ Web App');
+                showToast('❌ บันทึกลงชีตไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ Anyone ใน Apps Script');
             } finally {
                 btn.disabled = false;
                 btn.textContent = '☁️ บันทึกลงชีต';
