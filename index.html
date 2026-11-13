@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mint's Adventure - RPG & Bar Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+            user-select: none;
+        }
+        canvas {
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        /* หน้าปกเข้าเกม รองรับ cover.jpg */
+        #titleScreen {
+            background-image: linear-gradient(to top, rgba(9, 13, 22, 0.95) 10%, rgba(9, 13, 22, 0.35) 60%, rgba(9, 13, 22, 0.5) 100%), url('cover.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- ===================================================================== -->
+    <!-- 1. หน้าปกเข้าเกม (TITLE SCREEN)                                        -->
+    <!-- ===================================================================== -->
+    <div id="titleScreen" class="fixed inset-0 z-50 flex flex-col justify-between items-center p-6 bg-slate-950">
+        <div class="w-full max-w-4xl flex justify-between items-center">
+            <span class="px-3 py-1 bg-slate-900/80 border border-slate-700 rounded-full text-xs text-amber-300 font-semibold">
+                ☁️ Google Sheets Cloud Save Ready
+            </span>
+            <button onclick="openSheetModal()" class="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs text-slate-200 transition cursor-pointer">
+                ⚙️ ตั้งค่าลิงก์ Google Sheets
+            </button>
+        </div>
+
+        <div class="text-center max-w-lg w-full bg-slate-950/85 backdrop-blur-md border-2 border-amber-500/60 rounded-3xl p-6 sm:p-8 shadow-2xl">
+            <div class="inline-block px-3 py-1 bg-indigo-500/20 border border-indigo-400/30 rounded-full text-xs font-bold text-indigo-300 mb-2">
+                SIMULATOR • RPG • HIGH BAR CHALLENGE
+            </div>
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 mb-2">
+                บันทึกการผจญภัยของมิ้น
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-300 mb-6">
+                ฝึกฝนความแข็งแกร่ง โหนบาร์สูง ล่ามอนสเตอร์ และสะสมอุปกรณ์คู่ใจ
+            </p>
+
+            <div class="space-y-3">
+                <button onclick="startNewGame()" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/30 transition transform active:scale-95 cursor-pointer text-base">
+                    ⚔️ เริ่มผจญภัยใหม่ (มิ้น Lv.1)
+                </button>
+                <button onclick="loadFromSheets()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 transition transform active:scale-95 cursor-pointer text-base">
+                    ☁️ โหลดเซฟจาก Google Sheets
+                </button>
+            </div>
+            <p id="titleStatusText" class="text-xs text-slate-400 mt-4 min-h-[18px]"></p>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 2. หน้าจอหลักของเกม (MAIN GAME UI)                                   -->
+    <!-- ===================================================================== -->
+    <div id="mainGame" class="hidden flex-1 flex flex-col max-w-6xl w-full mx-auto p-3 sm:p-5 gap-4">
+        
+        <!-- Top Bar: ข้อมูลตัวละคร & ปุ่มเซฟ -->
+        <header class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:px-5 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center font-extrabold text-lg border border-indigo-400/40 shadow">
+                    Lv.<span id="uiLevel">1</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="font-bold text-base sm:text-lg text-white">มิ้น (Mint)</h2>
+                        <span id="uiLocationBadge" class="px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">
+                            🏰 ฐานที่มั่น
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                        <span>EXP: <strong id="uiExp" class="text-indigo-300">0</strong>/<span id="uiMaxExp">10</span></span>
+                        <span>•</span>
+                        <span>ฟื้นพลังงาน: <strong id="uiRegenRate" class="text-cyan-300">2.1</strong>/นาที</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-sm font-bold text-amber-300">
+                    💰 <span id="uiGold">0</span> G
+                </div>
+                <button onclick="saveToSheets()" id="btnSaveCloud" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition cursor-pointer flex items-center gap-1.5">
+                    ☁️ บันทึกลงชีต
+                </button>
+                <button onclick="openSheetModal()" class="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs text-slate-300 cursor-pointer" title="ตั้งค่า Google Sheets">
+                    ⚙️
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+            
+            <!-- Left Panel: ค่าสถานะ & อัปสเตตัส & กระเป๋าอุปกรณ์ (4 cols) -->
+            <aside class="lg:col-span-4 flex flex-col gap-4">
+                
+                <!-- หลอดพลังชีวิต & พลังงาน -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs font-bold mb-1">
+                            <span class="text-rose-400">❤️ พลังชีวิต (HP)</span>
+                            <span><span id="uiHp">10</span> / <span id="uiMaxHp">10</span></span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                            <div id="barHp" class="h-full bg-gradient-to-r from-rose-600 to-pink-500 transition-all duration-300" style="width: 100%"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-bold mb-1">
+                            <span class="text-cyan-400">⚡ พลังงาน (Energy)</span>
+                            <span><span id="uiEnergy">100</span> / <span id="uiMaxEnergy">100</span></span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                            <div id="barEnergy" class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ค่าสถานะและแต้มอัปเกรด -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-slate-200">📊 ค่าสถานะตัวละคร</h3>
+                        <span id="uiPointBadge" class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-slate-800 text-slate-400">
+                            แต้มคงเหลือ: <strong id="uiStatPoints" class="text-amber-400">0</strong>
+                        </span>
+                    </div>
+
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center justify-between bg-slate-800/60 px-3 py-2 rounded-xl border border-slate-700/60">
+                            <span>❤️ พลังชีวิตสูงสุด <span class="text-xs text-slate-400">(+5/แต้ม)</span></span>
+                            <div class="flex items-center gap-2">
+                                <strong id="statMaxHp" class="text-rose-300">10</strong>
+                                <button onclick="allocateStat('maxHp')" class="stat-plus-btn hidden w-6 h-6 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-lg text-xs cursor-pointer">+</button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between bg-slate-800/60 px-3 py-2 rounded-xl border border-slate-700/60">
+                            <span>⚔️ พลังโจมตี <span class="text-xs text-slate-400">(+1/แต้ม)</span></span>
+                            <div class="flex items-center gap-2">
+                                <strong id="statAtk" class="text-amber-300">1</strong>
+                                <button onclick="allocateStat('atk')" class="stat-plus-btn hidden w-6 h-6 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-lg text-xs cursor-pointer">+</button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between bg-slate-800/60 px-3 py-2 rounded-xl border border-slate-700/60">
+                            <span>🛡️ พลังป้องกัน <span class="text-xs text-slate-400">(+1/แต้ม)</span></span>
+                            <div class="flex items-center gap-2">
+                                <strong id="statDef" class="text-sky-300">1</strong>
+                                <button onclick="allocateStat('def')" class="stat-plus-btn hidden w-6 h-6 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-lg text-xs cursor-pointer">+</button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between bg-slate-800/60 px-3 py-2 rounded-xl border border-slate-700/60">
+                            <span>⚡ พลังงานสูงสุด <span class="text-xs text-slate-400">(+10/แต้ม)</span></span>
+                            <div class="flex items-center gap-2">
+                                <strong id="statMaxEnergy" class="text-cyan-300">100</strong>
+                                <button onclick="allocateStat('maxEnergy')" class="stat-plus-btn hidden w-6 h-6 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-lg text-xs cursor-pointer">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- อุปกรณ์ที่ครอบครอง (เก็บไว้แล้วพลังเพิ่มทันที) -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex-1">
+                    <h3 class="text-sm font-bold text-slate-200 mb-2">🎒 อุปกรณ์ในกระเป๋า <span class="text-xs font-normal text-slate-400">(เพิ่มพลังอัตโนมัติ)</span></h3>
+                    <div id="uiInventoryList" class="space-y-1.5 text-xs text-slate-300 max-h-40 overflow-y-auto">
+                        <p class="text-slate-500 italic">ยังไม่มีอุปกรณ์ (ซื้อได้ที่ร้านค้าในฐานที่มั่น)</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Right Panel: หน้าต่างฉากเกม & เมนูเลือกสถานที่ (8 cols) -->
+            <section class="lg:col-span-8 flex flex-col gap-4">
+                
+                <!-- แถบเลือกสถานที่ / กิจกรรม -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="switchScene('base')" id="tabBase" class="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-indigo-600 text-white border border-indigo-400/50 shadow cursor-pointer transition">
+                        🏰 ฐานที่มั่น & ร้านค้า
+                    </button>
+                    <button onclick="switchScene('gym')" id="tabGym" class="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 cursor-pointer transition">
+                        🤸‍♀️ ลานออกกำลังกาย (โหนบาร์)
+                    </button>
+                    <button onclick="switchScene('hunt')" id="tabHunt" class="py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 cursor-pointer transition">
+                        ⚔️ ออกล่าสัตว์ (-10⚡)
+                    </button>
+                </div>
+
+                <!-- หน้าต่าง Canvas แสดงผลตัวละครและฉาก -->
+                <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                    <canvas id="gameCanvas" class="w-full h-80 sm:h-96 block bg-slate-950"></canvas>
+
+                    <!-- UI เสริมสำหรับลานออกกำลังกาย (โหนบาร์สูง) -->
+                    <div id="gymOverlay" class="hidden absolute inset-x-0 top-3 px-4 flex justify-between items-start pointer-events-none">
+                        <div class="bg-slate-950/80 backdrop-blur border border-slate-700 px-3 py-2 rounded-xl text-xs space-y-1">
+                            <div>⏱️ เวลาโหนสะสม: <strong id="gymHangTimer" class="text-amber-300">0.0</strong> / 20.0 วินาที (+1 EXP)</div>
+                            <div class="text-slate-400">⬅️➡️ เดิน | ⬆️/Space กระโดดเกาะบาร์ | ⬇️ ปล่อยมือ</div>
+                        </div>
+
+                        <!-- แถบเตือนภัยเมื่อมีสาวๆ มาแกล้งจั๊กจี้ -->
+                        <div id="tickleAlertBox" class="hidden pointer-events-auto bg-pink-950/90 border-2 border-pink-500 px-4 py-2 rounded-2xl text-center shadow-lg animate-bounce">
+                            <div class="text-xs font-extrabold text-pink-200">⚠️ ระวัง! มีสาวแอบมาจั๊กจี้รักแร้!</div>
+                            <button onclick="resistTickle()" class="mt-1 px-3 py-1 bg-pink-500 hover:bg-pink-400 text-white font-bold rounded-lg text-xs cursor-pointer">
+                                👋 ปัดออก! (กด Space รัวๆ)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ปุ่มควบคุมบนมือถือสำหรับลานออกกำลังกาย -->
+                    <div id="gymTouchControls" class="hidden absolute bottom-3 right-3 flex gap-1.5 sm:hidden">
+                        <button id="mLeft" class="w-10 h-10 bg-slate-900/85 border border-slate-700 rounded-xl text-white">⬅️</button>
+                        <button id="mRight" class="w-10 h-10 bg-slate-900/85 border border-slate-700 rounded-xl text-white">➡️</button>
+                        <button id="mJump" class="w-10 h-10 bg-slate-900/85 border border-slate-700 rounded-xl text-white">⬆️</button>
+                        <button id="mDown" class="w-10 h-10 bg-slate-900/85 border border-slate-700 rounded-xl text-white">⬇️</button>
+                    </div>
+
+                    <!-- UI เสริมสำหรับหน้าต่อสู้ล่าสัตว์ (RPG Battle) -->
+                    <div id="huntOverlay" class="hidden absolute inset-x-0 bottom-3 px-4 flex justify-between items-end">
+                        <div id="monsterInfoCard" class="bg-slate-950/85 backdrop-blur border border-rose-500/40 px-4 py-2.5 rounded-2xl text-xs">
+                            <div class="font-bold text-rose-300 text-sm" id="monName">สไลม์ป่า (Slime)</div>
+                            <div class="mt-1">❤️ HP: <strong id="monHp">15</strong> / <span id="monMaxHp">15</span> | ⚔️ ATK: <span id="monAtk">2</span> | 🛡️ DEF: <span id="monDef">0</span></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="btnBattleAttack" onclick="playerAttackTurn()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg text-xs sm:text-sm cursor-pointer">
+                                ⚔️ โจมตี!
+                            </button>
+                            <button onclick="switchScene('base')" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs sm:text-sm cursor-pointer">
+                                🏃‍♀️ กลับฐาน
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แผงควบคุมด้านล่างตามสถานที่ -->
+                <div id="bottomActionPanel" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+                    <!-- โหมดฐานที่มั่น: พักผ่อน + ร้านค้าอุปกรณ์ -->
+                    <div id="panelBase" class="space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+                            <div>
+                                <h3 class="font-bold text-sm text-white">🏕️ พักผ่อนในฐานที่มั่น</h3>
+                                <p class="text-xs text-slate-400">ฟื้นฟู HP จนเต็ม (พลังงานจะฟื้นฟูอัตโนมัติตามเวลาจริง <span id="baseRegenHint">2.1</span> หน่วย/นาที)</p>
+                            </div>
+                            <button onclick="restAtBase()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer shadow">
+                                💖 พักฟื้น HP เต็ม (ฟรี)
+                            </button>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-sm text-amber-300 mb-2">🛒 ร้านค้าอุปกรณ์ (ซื้อเก็บไว้ในกระเป๋า พลังเพิ่มขึ้นทันที!)</h3>
+                            <div id="shopGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
+                        </div>
+                    </div>
+
+                    <!-- บันทึกเหตุการณ์ (Game Log) -->
+                    <div id="panelLog" class="mt-3 pt-3 border-t border-slate-800">
+                        <div class="text-[11px] font-bold text-slate-400 uppercase mb-1">📜 บันทึกเหตุการณ์</div>
+                        <div id="gameLog" class="text-xs text-slate-300 space-y-1 max-h-24 overflow-y-auto font-mono bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                            <div>ยินดีต้อนรับสู่ฐานที่มั่นของมิ้น!</div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 3. MODAL ตั้งค่า GOOGLE SHEETS WEB APP URL                             -->
+    <!-- ===================================================================== -->
+    <div id="sheetModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 class="text-lg font-bold text-white">☁️ เชื่อมต่อไฟล์เซฟ Google Sheets</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                นำลิงก์ <strong>Web App URL</strong> ที่ได้จากการ Deploy Google Apps Script มาวางด้านล่าง เพื่อบันทึกและโหลดค่าพลังของมิ้นได้ตลอดเวลา
+            </p>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">รหัสผู้เล่น (Player ID)</label>
+                <input id="inputPlayerId" type="text" value="MINT_01" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Google Apps Script Web App URL</label>
+                <input id="inputSheetUrl" type="text" placeholder="https://script.google.com/macros/s/...../exec" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white">
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeSheetModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-300 cursor-pointer">ปิด</button>
+                <button onclick="saveSheetConfig()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white cursor-pointer">บันทึกการตั้งค่า</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 border border-slate-600 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs sm:text-sm font-bold transform translate-y-24 opacity-0 transition-all duration-300 z-50"></div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. โมเดลตัวละครพิกเซลของ "มิ้น" (64x80 px • 10 อิริยาบถรวมท่าโหนบาร์โดนจั๊กจี้)
+         * ============================================================================
+         */
+        const PALETTE = {
+            '.': null,
+            'O': '#070709', 'H': '#141418', 'h': '#1e1b4b', 'L': '#3730a3', 'l': '#6366f1',
+            'S': '#fed7aa', 's': '#fdba74', 'd': '#fb923c', 'f': '#ffedd5', 'c': '#fb7185', 'C': '#f43f5e',
+            'E': '#0f172a', 'e': '#2563eb', 'W': '#ffffff', 'm': '#e11d48', 'M': '#fda4af',
+            'T': '#111827', 't': '#374151', 'u': '#6b7280', 'k': '#030712',
+            'P': '#2563eb', 'p': '#1d4ed8', 'D': '#1e3a8a', 'b': '#60a5fa', 'B': '#93c5fd',
+            'w': '#f8fafc', 'g': '#cbd5e1', 'G': '#475569',
+            'Y': '#eab308', 'y': '#fef08a',
+            'A': '#38bdf8', 'a': '#0284c7', 'R': '#ef4444', 'r': '#f97316'
+        };
+
+        function buildCharacterFrames() {
+            const W = 64, H = 80;
+            const createGrid = () => Array.from({ length: H }, () => Array(W).fill('.'));
+            const fillRect = (grid, x, y, w, h, ch) => {
+                for (let dy = 0; dy < h; dy++) {
+                    for (let dx = 0; dx < w; dx++) {
+                        const px = Math.round(x + dx), py = Math.round(y + dy);
+                        if (py >= 0 && py < H && px >= 0 && px < W) grid[py][px] = ch;
+                    }
+                }
+            };
+            const setPx = (grid, x, y, ch) => {
+                const px = Math.round(x), py = Math.round(y);
+                if (py >= 0 && py < H && px >= 0 && px < W) grid[py][px] = ch;
+            };
+            function drawLimbSegment(grid, x1, y1, x2, y2, thickness, colorMain, colorShadow, colorHighlight) {
+                const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1), 1);
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    const cx = Math.round(x1 + (x2 - x1) * t), cy = Math.round(y1 + (y2 - y1) * t);
+                    fillRect(grid, cx, cy, thickness, thickness, colorMain);
+                    if (colorShadow) setPx(grid, cx + thickness - 1, cy + thickness - 1, colorShadow);
+                    if (colorHighlight && i % 2 === 0) setPx(grid, cx, cy, colorHighlight);
+                }
+            }
+            function drawArmpitFeathers(g, shoulderY, torsoX, phase) {
+                const leftArmpitX = 21 + torsoX, rightArmpitX = 42 + torsoX, pitY = shoulderY;
+                const dyL = (phase === 0) ? 0 : (phase === 1 ? -1 : (phase === 2 ? 1 : 0));
+                const dyR = (phase === 1) ? 0 : (phase === 2 ? -1 : (phase === 3 ? 1 : 0));
+                setPx(g, leftArmpitX, pitY + dyL, 'W'); setPx(g, leftArmpitX - 1, pitY + dyL, 'W');
+                setPx(g, leftArmpitX - 1, pitY - 1 + dyL, 'y'); setPx(g, leftArmpitX - 2, pitY + 1 + dyL, 'W');
+                setPx(g, leftArmpitX - 3, pitY + 1 + dyL, 'W'); setPx(g, leftArmpitX - 4, pitY + 2 + dyL, 'Y');
+                setPx(g, leftArmpitX - 5, pitY + 3 + dyL, 'Y');
+                setPx(g, rightArmpitX, pitY + dyR, 'W'); setPx(g, rightArmpitX + 1, pitY + dyR, 'W');
+                setPx(g, rightArmpitX + 1, pitY - 1 + dyR, 'y'); setPx(g, rightArmpitX + 2, pitY + 1 + dyR, 'W');
+                setPx(g, rightArmpitX + 3, pitY + 1 + dyR, 'W'); setPx(g, rightArmpitX + 4, pitY + 2 + dyR, 'Y');
+                setPx(g, rightArmpitX + 5, pitY + 3 + dyR, 'Y');
+            }
+            function drawAttackEffect(g, phase, torsoY, torsoX) {
+                const startX = 52 + torsoX, centerY = torsoY + 4;
+                if (phase === 1) {
+                    fillRect(g, startX, centerY - 5, 2, 11, 'A'); fillRect(g, startX + 2, centerY - 3, 2, 7, 'W');
+                } else if (phase === 2) {
+                    fillRect(g, startX + 3, centerY - 4, 2, 9, 'A'); fillRect(g, startX + 5, centerY - 2, 2, 5, 'W');
+                }
+            }
+            function drawHurtEffect(g, phase, torsoY, torsoX) {
+                const hitX = 36 + torsoX, hitY = torsoY + 6;
+                if (phase === 0) {
+                    fillRect(g, hitX - 1, hitY - 1, 3, 3, 'W');
+                    setPx(g, hitX - 3, hitY - 3, 'R'); setPx(g, hitX + 3, hitY - 3, 'R');
+                    setPx(g, hitX - 3, hitY + 3, 'r'); setPx(g, hitX + 3, hitY + 3, 'r');
+                } else if (phase === 1) {
+                    setPx(g, hitX - 4, hitY - 4, 'R'); setPx(g, hitX + 4, hitY + 4, 'R');
+                }
+            }
+            function renderSingleArm(g, side, mode, shoulderX, shoulderY) {
+                const isLeft = side === 'left';
+                if (mode === 'idle') {
+                    const x = isLeft ? shoulderX - 3 : shoulderX;
+                    fillRect(g, x + (isLeft ? 1 : 0), shoulderY - 1, 3, 2, 'S');
+                    fillRect(g, x, shoulderY + 1, 4, 14, 'S');
+                    fillRect(g, x, shoulderY + 15, 4, 4, 'f');
+                } else if (mode === 'swingF') {
+                    drawLimbSegment(g, shoulderX - 1, shoulderY, shoulderX + 5, shoulderY + 14, 4, 'S', 's', 'f');
+                } else if (mode === 'swingB') {
+                    drawLimbSegment(g, shoulderX - 2, shoulderY, shoulderX - 7, shoulderY + 14, 4, 's', 'd', 'S');
+                } else if (mode === 'guardL') {
+                    drawLimbSegment(g, shoulderX - 2, shoulderY, shoulderX - 2, shoulderY + 6, 4, 'S', 's', 'f');
+                    drawLimbSegment(g, shoulderX - 2, shoulderY + 6, shoulderX + 4, shoulderY + 2, 4, 'S', 's', 'f');
+                    fillRect(g, shoulderX + 4, shoulderY + 1, 4, 4, 'f');
+                } else if (mode === 'guardR') {
+                    drawLimbSegment(g, shoulderX, shoulderY, shoulderX + 3, shoulderY + 6, 4, 'S', 's', 'f');
+                    drawLimbSegment(g, shoulderX + 3, shoulderY + 6, shoulderX + 7, shoulderY + 1, 4, 'S', 's', 'f');
+                    fillRect(g, shoulderX + 7, shoulderY, 4, 4, 'f');
+                } else if (mode === 'windupR') {
+                    drawLimbSegment(g, shoulderX - 1, shoulderY, shoulderX - 5, shoulderY + 3, 4, 'S', 's', 'f');
+                    fillRect(g, shoulderX - 3, shoulderY - 1, 4, 4, 'f');
+                } else if (mode === 'punchR') {
+                    drawLimbSegment(g, shoulderX, shoulderY, shoulderX + 12, shoulderY, 4, 'S', 's', 'f');
+                    fillRect(g, shoulderX + 12, shoulderY - 1, 5, 5, 'f');
+                } else if (mode === 'hurtL') {
+                    drawLimbSegment(g, shoulderX - 2, shoulderY, shoulderX - 4, shoulderY - 7, 4, 'S', 's', 'f');
+                } else if (mode === 'hurtR') {
+                    drawLimbSegment(g, shoulderX, shoulderY, shoulderX + 7, shoulderY - 2, 4, 'S', 's', 'f');
+                } else if (mode === 'jump') {
+                    const wristX = isLeft ? shoulderX - 10 : shoulderX + 9, wristY = shoulderY - 10;
+                    drawLimbSegment(g, shoulderX - 1, shoulderY, wristX, wristY, 4, 'S', 's', 'f');
+                } else if (mode === 'hang') {
+                    const armX = isLeft ? shoulderX - 3 : shoulderX;
+                    for (let y = 4; y <= shoulderY; y++) fillRect(g, armX, y, 4, 1, 'S');
+                    fillRect(g, armX - 1, 0, 5, 4, 'f');
+                } else if (mode === 'hangTense') {
+                    const handX = isLeft ? 19 : 40;
+                    const elbowX = isLeft ? shoulderX - 4 : shoulderX + 1, elbowY = Math.round((shoulderY + 4) / 2);
+                    drawLimbSegment(g, isLeft ? shoulderX - 3 : shoulderX, shoulderY - 2, elbowX, elbowY, 4, 'S', 's', 'f');
+                    drawLimbSegment(g, elbowX, elbowY, handX, 3, 4, 'S', 's', 'f');
+                    fillRect(g, handX - 1, 0, 5, 4, 'f');
+                } else if (mode === 'hangReach') {
+                    const handX = isLeft ? shoulderX + 5 : shoulderX + 7;
+                    drawLimbSegment(g, shoulderX - 1, shoulderY - 2, handX, 4, 4, 'S', 's', 'f');
+                    fillRect(g, handX - 1, 0, 5, 4, 'f');
+                } else if (mode === 'hangPull') {
+                    const handX = isLeft ? shoulderX - 8 : shoulderX - 7;
+                    drawLimbSegment(g, shoulderX - 1, shoulderY - 2, handX, 4, 4, 'S', 's', 'f');
+                    fillRect(g, handX - 1, 0, 5, 4, 'f');
+                }
+            }
+
+            function renderPose({
+                headY = 0, headX = 0, bodyY = 0, bodyX = 0,
+                blink = false, squint = false, serious = false, shocked = false, smile = false, laugh = false, blushIntense = false,
+                hairSway = 0, hairLift = 0, leftArm = 'idle', rightArm = 'idle', legPose = 'stand',
+                featherPhase = -1, attackPhase = -1, hurtPhase = -1
+            }) {
+                const g = createGrid();
+                const leftArmRaised = ['jump', 'hang', 'hangTense', 'hangReach', 'hangPull', 'hurtL'].includes(leftArm);
+                const rightArmRaised = ['jump', 'hang', 'hangTense', 'hangReach', 'hangPull', 'hurtR'].includes(rightArm);
+
+                // Layer 1: ผมยาวด้านหลัง
+                const backHairTop = 12 + headY - Math.round(hairLift * 0.4);
+                const backHairBottom = 57 + bodyY - hairLift;
+                for (let y = backHairTop; y <= backHairBottom; y++) {
+                    const progress = (y - backHairTop) / Math.max(1, (backHairBottom - backHairTop));
+                    const swayOffset = Math.round(hairSway * Math.pow(progress, 1.35)) + Math.round(bodyX * progress);
+                    const leftX = 18 + swayOffset, rightX = 45 + swayOffset;
+                    for (let x = leftX; x <= rightX; x++) {
+                        if (x === leftX || x === rightX || y === backHairBottom) setPx(g, x, y, 'O');
+                        else if (x <= leftX + 2 || x >= rightX - 2) setPx(g, x, y, 'h');
+                        else if ((x === 24 + swayOffset || x === 39 + swayOffset) && y % 6 !== 0) setPx(g, x, y, 'L');
+                        else setPx(g, x, y, 'H');
+                    }
+                }
+
+                // Layer 2: แขนหลัง
+                const torsoY = 28 + bodyY, torsoX = bodyX;
+                const leftShoulderX = 22 + torsoX, rightShoulderX = 40 + torsoX, shoulderY = torsoY + 3;
+                if (leftArm === 'swingB') renderSingleArm(g, 'left', leftArm, leftShoulderX, shoulderY);
+                if (rightArm === 'swingB') renderSingleArm(g, 'right', rightArm, rightShoulderX, shoulderY);
+
+                // Layer 3: กางเกงยีนส์ รองเท้า เสื้อเกาะอก
+                const hipY = 44 + bodyY, hipX = Math.round(bodyX * 0.6);
+                fillRect(g, 23 + hipX, hipY, 18, 9, 'P');
+                fillRect(g, 24 + hipX, hipY, 16, 1, 'D');
+
+                const drawLegWithShoe = (topX, topY, botX, len, isBackLeg = false) => {
+                    const baseC = isBackLeg ? 'p' : 'P';
+                    for (let i = 0; i < len; i++) {
+                        const t = i / Math.max(1, len - 1);
+                        const cx = Math.round(topX + (botX - topX) * t), cy = topY + i;
+                        fillRect(g, cx, cy, 6, 1, baseC);
+                        setPx(g, cx, cy, 'D'); setPx(g, cx + 5, cy, 'D');
+                    }
+                    const shoeY = topY + len;
+                    fillRect(g, botX, shoeY, 9, 4, 'w');
+                    fillRect(g, botX, shoeY + 4, 9, 1, 'G');
+                };
+
+                if (legPose === 'stand') { drawLegWithShoe(23, hipY + 9, 23, 21); drawLegWithShoe(34, hipY + 9, 34, 21); }
+                else if (legPose === 'combatStance') { drawLegWithShoe(23 + hipX, hipY + 9, 18, 21, true); drawLegWithShoe(34 + hipX, hipY + 9, 38, 21); }
+                else if (legPose === 'lunge') { drawLegWithShoe(23 + hipX, hipY + 9, 15, 21, true); drawLegWithShoe(34 + hipX, hipY + 9, 42, 20); }
+                else if (legPose === 'hurtStagger') { drawLegWithShoe(23 + hipX, hipY + 9, 21, 21, true); drawLegWithShoe(34 + hipX, hipY + 9, 36, 20); }
+                else if (legPose === 'walk1') { drawLegWithShoe(23, hipY + 9, 15, 20, true); drawLegWithShoe(34, hipY + 9, 42, 20); }
+                else if (legPose === 'walk4') { drawLegWithShoe(34, hipY + 9, 25, 20, true); drawLegWithShoe(24, hipY + 9, 35, 20); }
+                else if (legPose === 'jump') { drawLegWithShoe(22, hipY + 8, 18, 15, true); drawLegWithShoe(36, hipY + 12, 35, 12); }
+                else if (legPose === 'hangIdle') { drawLegWithShoe(24 + hipX, hipY + 9, 24 + hipX, 21); drawLegWithShoe(34 + hipX, hipY + 9, 34 + hipX, 21); }
+                else if (legPose === 'climb1') { drawLegWithShoe(23 + hipX, hipY + 9, 19 + hipX, 21, true); drawLegWithShoe(36 + hipX, hipY + 12, 36 + hipX, 12); }
+                else if (legPose === 'climb2') { drawLegWithShoe(26 + hipX, hipY + 12, 26 + hipX, 12); drawLegWithShoe(34 + hipX, hipY + 9, 30 + hipX, 21, true); }
+                else if (legPose === 'tickle1') { drawLegWithShoe(23 + hipX, hipY + 11, 19 + hipX, 14); drawLegWithShoe(34 + hipX, hipY + 9, 39 + hipX, 20, true); }
+                else if (legPose === 'tickle2') { drawLegWithShoe(23 + hipX, hipY + 9, 18 + hipX, 20, true); drawLegWithShoe(35 + hipX, hipY + 11, 39 + hipX, 14); }
+
+                // คอ ไหล่ รักแร้ และเสื้อเกาะอกสีดำ
+                fillRect(g, 28 + torsoX, torsoY - 4, 8, 5, 's');
+                fillRect(g, 29 + torsoX, torsoY - 4, 6, 4, 'S');
+                fillRect(g, 21 + torsoX, torsoY + 1, 22, 4, 'S');
+                setPx(g, 21 + torsoX, torsoY + 3, 's'); setPx(g, 42 + torsoX, torsoY + 3, 's');
+                fillRect(g, 23 + torsoX, torsoY + 5, 18, 9, 'T');
+                fillRect(g, 27 + torsoX, torsoY + 5, 10, 1, 'u');
+                fillRect(g, 24 + torsoX, torsoY + 14, 16, 2, 'S');
+
+                // Layer 4: ศีรษะและใบหน้า
+                const hY = 7 + headY, hX = bodyX + headX;
+                fillRect(g, 23 + hX, hY + 5, 18, 12, 'S');
+                fillRect(g, 24 + hX, hY + 17, 16, 2, 'S');
+                fillRect(g, 26 + hX, hY + 19, 12, 1, 's');
+
+                if (squint) {
+                    setPx(g, 26 + hX, hY + 10, 'O'); setPx(g, 27 + hX, hY + 11, 'O'); setPx(g, 26 + hX, hY + 12, 'O');
+                    setPx(g, 37 + hX, hY + 10, 'O'); setPx(g, 36 + hX, hY + 11, 'O'); setPx(g, 37 + hX, hY + 12, 'O');
+                } else if (blink) {
+                    fillRect(g, 25 + hX, hY + 11, 4, 1, 'O'); fillRect(g, 35 + hX, hY + 11, 4, 1, 'O');
+                } else {
+                    fillRect(g, 25 + hX, hY + 10, 4, 3, 'E'); setPx(g, 25 + hX, hY + 10, 'W');
+                    fillRect(g, 35 + hX, hY + 10, 4, 3, 'E'); setPx(g, 35 + hX, hY + 10, 'W');
+                }
+
+                if (blushIntense) {
+                    fillRect(g, 24 + hX, hY + 13, 4, 2, 'C'); fillRect(g, 36 + hX, hY + 13, 4, 2, 'C');
+                } else {
+                    fillRect(g, 24 + hX, hY + 14, 3, 1, 'c'); fillRect(g, 37 + hX, hY + 14, 3, 1, 'c');
+                }
+
+                if (laugh) { fillRect(g, 29 + hX, hY + 15, 6, 3, 'm'); fillRect(g, 31 + hX, hY + 16, 2, 1, 'M'); }
+                else if (shocked) { fillRect(g, 30 + hX, hY + 15, 4, 3, 'm'); }
+                else { fillRect(g, 30 + hX, hY + 16, 4, 1, 'm'); }
+
+                // ผมบนศีรษะ & หน้าม้า
+                fillRect(g, 20 + hX, hY, 24, 5, 'H');
+                fillRect(g, 24 + hX, hY + 2, 16, 1, 'L');
+                fillRect(g, 20 + hX, hY + 5, 5, 4, 'H');
+                fillRect(g, 26 + hX, hY + 5, 5, 2, 'H');
+                fillRect(g, 32 + hX, hY + 5, 5, 3, 'H');
+                fillRect(g, 38 + hX, hY + 5, 6, 4, 'H');
+
+                // Layer 5: ปอยผมกรอบหน้า
+                const leftLockLen = leftArmRaised ? 13 : 22, rightLockLen = rightArmRaised ? 13 : 22;
+                for (let ly = 0; ly < leftLockLen; ly++) fillRect(g, 19 + hX, hY + 5 + ly, 3, 1, 'H');
+                for (let ly = 0; ly < rightLockLen; ly++) fillRect(g, 42 + hX, hY + 5 + ly, 3, 1, 'H');
+
+                // Layer 6: แขนหน้า & เอฟเฟกต์
+                if (leftArm !== 'swingB') renderSingleArm(g, 'left', leftArm, leftShoulderX, shoulderY);
+                if (rightArm !== 'swingB') renderSingleArm(g, 'right', rightArm, rightShoulderX, shoulderY);
+                if (featherPhase >= 0) drawArmpitFeathers(g, shoulderY, torsoX, featherPhase);
+                if (attackPhase >= 0) drawAttackEffect(g, attackPhase, torsoY, torsoX);
+                if (hurtPhase >= 0) drawHurtEffect(g, hurtPhase, torsoY, torsoX);
+
+                return g.map(row => row.join(''));
+            }
+
+            return {
+                idle: [
+                    renderPose({ headY: 0, bodyY: 0 }),
+                    renderPose({ headY: 1, bodyY: 1, hairSway: -1 }),
+                    renderPose({ headY: 1, bodyY: 1 }),
+                    renderPose({ headY: 0, bodyY: 0, blink: true })
+                ],
+                walk: [
+                    renderPose({ hairSway: -4, legPose: 'walk1', leftArm: 'swingF', rightArm: 'swingB' }),
+                    renderPose({ headY: 1, bodyY: 1, hairSway: -3, legPose: 'walk1', leftArm: 'swingF', rightArm: 'swingB' }),
+                    renderPose({ hairSway: -4, legPose: 'walk4', leftArm: 'swingB', rightArm: 'swingF' }),
+                    renderPose({ headY: 1, bodyY: 1, hairSway: -3, legPose: 'walk4', leftArm: 'swingB', rightArm: 'swingF' })
+                ],
+                jump: [
+                    renderPose({ headY: -1, bodyY: -1, legPose: 'jump', leftArm: 'jump', rightArm: 'jump' }),
+                    renderPose({ hairLift: 5, legPose: 'jump', leftArm: 'jump', rightArm: 'jump' })
+                ],
+                hang: [
+                    renderPose({ headY: 4, bodyY: 4, leftArm: 'hang', rightArm: 'hang', legPose: 'hangIdle' }),
+                    renderPose({ headY: 5, bodyY: 5, leftArm: 'hang', rightArm: 'hang', legPose: 'hangIdle', blink: true })
+                ],
+                climb: [
+                    renderPose({ headY: 4, bodyY: 4, bodyX: -1, leftArm: 'hangPull', rightArm: 'hangReach', legPose: 'climb1' }),
+                    renderPose({ headY: 4, bodyY: 4, bodyX: 1, leftArm: 'hangReach', rightArm: 'hangPull', legPose: 'climb2' })
+                ],
+                tickle: [
+                    renderPose({ headY: 3, headX: 1, bodyY: 2, bodyX: 1, squint: true, laugh: true, blushIntense: true, leftArm: 'hangTense', rightArm: 'hangTense', legPose: 'tickle1', featherPhase: -1 }),
+                    renderPose({ headY: 2, headX: -1, bodyY: 1, bodyX: -1, squint: true, laugh: true, blushIntense: true, leftArm: 'hangTense', rightArm: 'hangTense', legPose: 'tickle2', featherPhase: -1 })
+                ],
+                tickleFeather: [
+                    renderPose({ headY: 3, headX: 1, bodyY: 2, bodyX: 1, squint: true, laugh: true, blushIntense: true, leftArm: 'hangTense', rightArm: 'hangTense', legPose: 'tickle1', featherPhase: 0 }),
+                    renderPose({ headY: 2, headX: -1, bodyY: 1, bodyX: -1, squint: true, laugh: true, blushIntense: true, leftArm: 'hangTense', rightArm: 'hangTense', legPose: 'tickle2', featherPhase: 1 })
+                ],
+                attack: [
+                    renderPose({ bodyX: -2, serious: true, leftArm: 'guardL', rightArm: 'windupR', legPose: 'combatStance', attackPhase: 0 }),
+                    renderPose({ bodyX: 3, serious: true, leftArm: 'guardL', rightArm: 'punchR', legPose: 'lunge', attackPhase: 1 }),
+                    renderPose({ bodyX: 2, serious: true, leftArm: 'guardL', rightArm: 'punchR', legPose: 'lunge', attackPhase: 2 }),
+                    renderPose({ bodyX: 0, serious: true, leftArm: 'guardL', rightArm: 'guardR', legPose: 'combatStance' })
+                ],
+                hurt: [
+                    renderPose({ headX: -2, bodyX: -3, squint: true, shocked: true, leftArm: 'hurtL', rightArm: 'hurtR', legPose: 'hurtStagger', hurtPhase: 0 }),
+                    renderPose({ headX: -1, bodyX: -2, shocked: true, leftArm: 'hurtL', rightArm: 'hurtR', legPose: 'hurtStagger', hurtPhase: 1 })
+                ]
+            };
+        }
+
+        const CHARACTER_FRAMES = buildCharacterFrames();
+        const FRAME_W = 64, FRAME_H = 80;
+        const STATE_ORDER = Object.keys(CHARACTER_FRAMES);
+        const STATE_ROW_MAP = {};
+        const masterSheetCanvas = document.createElement('canvas');
+        masterSheetCanvas.width = 6 * FRAME_W;
+        masterSheetCanvas.height = STATE_ORDER.length * FRAME_H;
+        const masterCtx = masterSheetCanvas.getContext('2d');
+        masterCtx.imageSmoothingEnabled = false;
+
+        STATE_ORDER.forEach((state, rowIndex) => {
+            STATE_ROW_MAP[state] = rowIndex;
+            CHARACTER_FRAMES[state].forEach((matrix, colIndex) => {
+                for (let r = 0; r < FRAME_H; r++) {
+                    for (let c = 0; c < FRAME_W; c++) {
+                        const color = PALETTE[matrix[r][c]];
+                        if (color) {
+                            masterCtx.fillStyle = color;
+                            masterCtx.fillRect(colIndex * FRAME_W + c, rowIndex * FRAME_H + r, 1, 1);
+                        }
+                    }
+                }
+            });
+        });
+
+        function drawMint(ctx, x, y, scale = 2.6, state = 'idle', frameIndex = 0, flip = false) {
+            const frames = CHARACTER_FRAMES[state] || CHARACTER_FRAMES.idle;
+            const col = frameIndex % frames.length;
+            const row = STATE_ROW_MAP[state] ?? 0;
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            if (flip) {
+                ctx.translate(x + FRAME_W * scale, y);
+                ctx.scale(-1, 1);
+            } else {
+                ctx.translate(x, y);
+            }
+            ctx.drawImage(masterSheetCanvas, col * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H, 0, 0, FRAME_W * scale, FRAME_H * scale);
+            ctx.restore();
+        }
+
+        /**
+         * ============================================================================
+         * 2. ข้อมูลเกม & ค่าสถานะเริ่มต้นของ "มิ้น"
+         * ============================================================================
+         */
+        const SHOP_ITEMS = [
+            { id: 'gloves_leather', name: '🥊 ถุงมือหนังฝึกซ้อม', bonusText: 'ATK +1', atk: 1, def: 0, hp: 0, price: 15 },
+            { id: 'vest_guard',     name: '🦺 เสื้อคลุมกันลม',      bonusText: 'DEF +1', atk: 0, def: 1, hp: 0, price: 15 },
+            { id: 'charm_life',     name: '🧿 เครื่องรางพลังชีวิต',  bonusText: 'MaxHP +10', atk: 0, def: 0, hp: 10, price: 25 },
+            { id: 'knuckle_steel',  name: '⚔️ สนับมือเหล็กกล้า',     bonusText: 'ATK +3', atk: 3, def: 0, hp: 0, price: 50 },
+            { id: 'armor_knight',   name: '🛡️ เกราะเบาอัศวิน',      bonusText: 'DEF +3, HP +15', atk: 0, def: 3, hp: 15, price: 65 }
+        ];
+
+        const MONSTERS = [
+            { name: 'สไลม์ป่า (Slime)', maxHp: 12, atk: 2, def: 0, gold: 8, exp: 4, color: '#22c55e' },
+            { name: 'หมาป่าทุ่งหญ้า (Wolf)', maxHp: 22, atk: 4, def: 1, gold: 15, exp: 7, color: '#94a3b8' },
+            { name: 'โกเลมหิน (Rock Golem)', maxHp: 40, atk: 7, def: 3, gold: 30, exp: 14, color: '#d97706' }
+        ];
+
+        let player = {
+            playerId: 'MINT_01',
+            name: 'มิ้น',
+            level: 1,
+            exp: 0,
+            maxExp: 10,
+            statPoints: 0,
+            // ค่าสถานะพื้นฐาน (Base Stats)
+            baseMaxHp: 10,
+            baseAtk: 1,
+            baseDef: 1,
+            hp: 10,
+            energy: 100,
+            maxEnergy: 100,
+            gold: 0,
+            inventory: [], // เก็บ ID ของอุปกรณ์ที่ซื้อแล้ว
+            lastUpdate: Date.now()
+        };
+
+        let sheetConfig = {
+            url: localStorage.getItem('mint_sheet_url') || '',
+            playerId: localStorage.getItem('mint_player_id') || 'MINT_01'
+        };
+
+        // คำนวณค่าพลังรวม (Base + อุปกรณ์ในกระเป๋า)
+        function getTotalStats() {
+            let bonusHp = 0, bonusAtk = 0, bonusDef = 0;
+            player.inventory.forEach(itemId => {
+                const item = SHOP_ITEMS.find(i => i.id === itemId);
+                if (item) {
+                    bonusHp += item.hp;
+                    bonusAtk += item.atk;
+                    bonusDef += item.def;
+                }
+            });
+            return {
+                maxHp: player.baseMaxHp + bonusHp,
+                atk: player.baseAtk + bonusAtk,
+                def: player.baseDef + bonusDef,
+                maxEnergy: player.maxEnergy,
+                regenPerMin: Number((2 + (player.level * 0.1)).toFixed(1))
+            };
+        }
+
+        function addLog(msg, colorClass = 'text-slate-300') {
+            const logBox = document.getElementById('gameLog');
+            const div = document.createElement('div');
+            div.className = colorClass;
+            div.textContent = `• ${msg}`;
+            logBox.prepend(div);
+            if (logBox.children.length > 25) logBox.lastChild.remove();
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-24', 'opacity-0'), 2800);
+        }
+
+        function gainExp(amount) {
+            player.exp += amount;
+            addLog(`ได้รับประสบการณ์ +${amount} EXP!`, 'text-indigo-300');
+            while (player.exp >= player.maxExp) {
+                player.exp -= player.maxExp;
+                player.level += 1;
+                player.maxExp = Math.round(player.maxExp * 1.35);
+                player.statPoints += 1; // ได้ 1 แต้มอิสระ (ไม่มีสถานะเพิ่มอัตโนมัติ)
+                addLog(`🎉 เลเวลอัปเป็น Lv.${player.level}! ได้รับ 1 แต้มสถานะ (เลือกอัปเองได้เลย)`, 'text-amber-300 font-bold');
+                showToast(`🎉 เลเวลอัป Lv.${player.level}! กด + เพื่ออัปค่าพลังได้เลย`);
+            }
+            updateUI();
+        }
+
+        function allocateStat(statKey) {
+            if (player.statPoints <= 0) return;
+            player.statPoints -= 1;
+            if (statKey === 'maxHp') {
+                player.baseMaxHp += 5;
+                player.hp += 5;
+                addLog('อัปเกรด พลังชีวิตสูงสุด +5!', 'text-rose-300');
+            } else if (statKey === 'atk') {
+                player.baseAtk += 1;
+                addLog('อัปเกรด พลังโจมตี +1!', 'text-amber-300');
+            } else if (statKey === 'def') {
+                player.baseDef += 1;
+                addLog('อัปเกรด พลังป้องกัน +1!', 'text-sky-300');
+            } else if (statKey === 'maxEnergy') {
+                player.maxEnergy += 10;
+                player.energy = Math.min(player.maxEnergy, player.energy + 10);
+                addLog('อัปเกรด พลังงานสูงสุด +10!', 'text-cyan-300');
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            const stats = getTotalStats();
+            if (player.hp > stats.maxHp) player.hp = stats.maxHp;
+
+            document.getElementById('uiLevel').textContent = player.level;
+            document.getElementById('uiExp').textContent = player.exp;
+            document.getElementById('uiMaxExp').textContent = player.maxExp;
+            document.getElementById('uiRegenRate').textContent = stats.regenPerMin;
+            document.getElementById('baseRegenHint').textContent = stats.regenPerMin;
+            document.getElementById('uiGold').textContent = player.gold;
+
+            document.getElementById('uiHp').textContent = Math.ceil(player.hp);
+            document.getElementById('uiMaxHp').textContent = stats.maxHp;
+            document.getElementById('barHp').style.width = `${Math.max(0, Math.min(100, (player.hp / stats.maxHp) * 100))}%`;
+
+            document.getElementById('uiEnergy').textContent = Math.floor(player.energy);
+            document.getElementById('uiMaxEnergy').textContent = stats.maxEnergy;
+            document.getElementById('barEnergy').style.width = `${Math.max(0, Math.min(100, (player.energy / stats.maxEnergy) * 100))}%`;
+
+            document.getElementById('statMaxHp').textContent = stats.maxHp;
+            document.getElementById('statAtk').textContent = stats.atk;
+            document.getElementById('statDef').textContent = stats.def;
+            document.getElementById('statMaxEnergy').textContent = stats.maxEnergy;
+
+            // ปุ่ม + อัปแต้ม
+            document.getElementById('uiStatPoints').textContent = player.statPoints;
+            document.querySelectorAll('.stat-plus-btn').forEach(btn => {
+                if (player.statPoints > 0) btn.classList.remove('hidden');
+                else btn.classList.add('hidden');
+            });
+
+            // รายการอุปกรณ์ในกระเป๋า
+            const invEl = document.getElementById('uiInventoryList');
+            if (player.inventory.length === 0) {
+                invEl.innerHTML = '<p class="text-slate-500 italic">ยังไม่มีอุปกรณ์ (ซื้อได้ที่ร้านค้าในฐานที่มั่น)</p>';
+            } else {
+                invEl.innerHTML = player.inventory.map(id => {
+                    const item = SHOP_ITEMS.find(i => i.id === id);
+                    return item ? `<div class="flex justify-between bg-slate-800/70 px-2.5 py-1.5 rounded-lg border border-slate-700/60"><span>${item.name}</span><span class="text-emerald-400 font-bold">${item.bonusText}</span></div>` : '';
+                }).join('');
+            }
+
+            renderShop();
+        }
+
+        function renderShop() {
+            const shopGrid = document.getElementById('shopGrid');
+            shopGrid.innerHTML = SHOP_ITEMS.map(item => {
+                const owned = player.inventory.includes(item.id);
+                return `
+                    <div class="flex items-center justify-between bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
+                        <div>
+                            <div class="text-xs font-bold text-white">${item.name}</div>
+                            <div class="text-[11px] text-emerald-400">${item.bonusText}</div>
+                        </div>
+                        ${owned
+                            ? `<span class="px-2.5 py-1 bg-slate-700 text-slate-400 rounded-lg text-xs font-bold">มีแล้ว</span>`
+                            : `<button onclick="buyItem('${item.id}')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold cursor-pointer">💰 ${item.price} G</button>`
+                        }
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function buyItem(itemId) {
+            const item = SHOP_ITEMS.find(i => i.id === itemId);
+            if (!item || player.inventory.includes(itemId)) return;
+            if (player.gold < item.price) {
+                showToast('💰 เงินไม่พอ! ออกไปล่าสัตว์หาเงินก่อนนะคะ');
+                return;
+            }
+            player.gold -= item.price;
+            player.inventory.push(itemId);
+            if (item.hp > 0) player.hp += item.hp;
+            addLog(`ซื้อ ${item.name} (${item.bonusText}) เก็บเข้ากระเป๋าแล้ว!`, 'text-emerald-300');
+            showToast(`ได้รับ ${item.name}!`);
+            updateUI();
+        }
+
+        function restAtBase() {
+            const stats = getTotalStats();
+            player.hp = stats.maxHp;
+            addLog('พักผ่อนที่ฐานที่มั่น ฟื้นฟูพลังชีวิตเต็ม 100%!', 'text-emerald-300');
+            showToast('💖 ฟื้นฟูพลังชีวิตเต็มแล้ว!');
+            updateUI();
+        }
+
+        // ระบบฟื้นฟูพลังงานอัตโนมัติ (2 + Level * 0.1 หน่วยต่อนาที)
+        setInterval(() => {
+            if (document.getElementById('mainGame').classList.contains('hidden')) return;
+            // ไม่ฟื้นฟูขณะกำลังโหนบาร์อยู่
+            if (sim.scene === 'gym' && sim.isHanging) return;
+
+            const stats = getTotalStats();
+            const perSecond = stats.regenPerMin / 60;
+            if (player.energy < stats.maxEnergy) {
+                player.energy = Math.min(stats.maxEnergy, player.energy + perSecond);
+                updateUI();
+            }
+        }, 1000);
+
+        /**
+         * ============================================================================
+         * 3. ระบบฉากเกมทั้ง 3 โหมด: ฐานที่มั่น / ลานออกกำลังกายโหนบาร์ / ล่าสัตว์ RPG
+         * ============================================================================
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let sim = {
+            scene: 'base', // 'base' | 'gym' | 'hunt'
+            mintX: 280,
+            mintY: 0,
+            vy: 0,
+            flip: false,
+            state: 'idle',
+            frame: 0,
+            tick: 0,
+            isGrounded: true,
+            isHanging: false,
+            grabCooldown: 0,
+            hangSeconds: 0,
+            // ระบบสาวๆ มาแกล้งจั๊กจี้ขณะโหนบาร์
+            prankster: {
+                active: false,
+                x: 0,
+                tickling: false,
+                resistCount: 0,
+                tickleTimer: 0
+            },
+            // ระบบต่อสู้ล่าสัตว์ RPG
+            battle: {
+                monster: null,
+                monHp: 0,
+                busy: false,
+                monHitAnim: 0
+            },
+            keys: { left: false, right: false, up: false, down: false }
+        };
+
+        function resizeGameCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width > 0) {
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            }
+        }
+        window.addEventListener('resize', resizeGameCanvas);
+
+        function switchScene(targetScene) {
+            if (targetScene === 'hunt') {
+                if (player.energy < 10) {
+                    showToast('⚡ พลังงานไม่พอ! (ต้องใช้ 10 หน่วยในการล่าสัตว์)');
+                    return;
+                }
+                if (player.hp <= 0) {
+                    showToast('❤️ พลังชีวิตหมด! พักฟื้นที่ฐานที่มั่นก่อนนะคะ');
+                    return;
+                }
+                player.energy -= 10;
+                startHuntBattle();
+            }
+
+            sim.scene = targetScene;
+            sim.isHanging = false;
+            sim.prankster.active = false;
+            sim.prankster.tickling = false;
+            document.getElementById('tickleAlertBox').classList.add('hidden');
+
+            // อัปเดตแถบปุ่มสถานที่
+            ['base', 'gym', 'hunt'].forEach(s => {
+                const btn = document.getElementById('tab' + s.charAt(0).toUpperCase() + s.slice(1));
+                if (s === targetScene) {
+                    btn.className = 'py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-indigo-600 text-white border border-indigo-400/50 shadow cursor-pointer transition';
+                } else {
+                    btn.className = 'py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 cursor-pointer transition';
+                }
+            });
+
+            document.getElementById('gymOverlay').classList.toggle('hidden', targetScene !== 'gym');
+            document.getElementById('gymTouchControls').classList.toggle('hidden', targetScene !== 'gym');
+            document.getElementById('huntOverlay').classList.toggle('hidden', targetScene !== 'hunt');
+            document.getElementById('panelBase').classList.toggle('hidden', targetScene !== 'base');
+
+            const badge = document.getElementById('uiLocationBadge');
+            if (targetScene === 'base') {
+                badge.textContent = '🏰 ฐานที่มั่น';
+                sim.mintX = canvas.width * 0.42;
+                sim.state = 'idle';
+            } else if (targetScene === 'gym') {
+                badge.textContent = '🤸‍♀️ ลานออกกำลังกาย';
+                sim.mintX = canvas.width * 0.35;
+                sim.state = 'idle';
+                addLog('มาถึงลานออกกำลังกาย! กระโดดขึ้นโหนบาร์เพื่อรับ 1 EXP ต่อ 20 วินาที', 'text-cyan-300');
+            } else if (targetScene === 'hunt') {
+                badge.textContent = '⚔️ ป่าล่าสัตว์';
+                sim.mintX = canvas.width * 0.25;
+                sim.flip = false;
+                sim.state = 'idle';
+            }
+            updateUI();
+        }
+
+        // --- ระบบต่อสู้ RPG ล่าสัตว์ ---
+        function startHuntBattle() {
+            // สุ่มมอนสเตอร์ตามเลเวล
+            const pool = player.level >= 4 ? MONSTERS : (player.level >= 2 ? MONSTERS.slice(0, 2) : [MONSTERS[0]]);
+            const template = pool[Math.floor(Math.random() * pool.length)];
+            sim.battle.monster = { ...template };
+            sim.battle.monHp = template.maxHp;
+            sim.battle.busy = false;
+
+            document.getElementById('monName').textContent = template.name;
+            document.getElementById('monHp').textContent = sim.battle.monHp;
+            document.getElementById('monMaxHp').textContent = template.maxHp;
+            document.getElementById('monAtk').textContent = template.atk;
+            document.getElementById('monDef').textContent = template.def;
+            addLog(`พบ ${template.name}! (ใช้พลังงาน 10 หน่วย)`, 'text-amber-300');
+        }
+
+        function playerAttackTurn() {
+            if (sim.scene !== 'hunt' || sim.battle.busy || !sim.battle.monster) return;
+            sim.battle.busy = true;
+            const stats = getTotalStats();
+            const mon = sim.battle.monster;
+
+            // เทิร์นมิ้นโจมตี (ดาเมจขั้นต่ำ 1)
+            sim.state = 'attack';
+            sim.frame = 0;
+            const dmgToMon = Math.max(1, stats.atk - mon.def);
+            sim.battle.monHp = Math.max(0, sim.battle.monHp - dmgToMon);
+            sim.battle.monHitAnim = 15;
+            document.getElementById('monHp').textContent = sim.battle.monHp;
+            addLog(`มิ้นโจมตี ${mon.name} สร้างความเสียหาย ${dmgToMon} หน่วย!`, 'text-amber-200');
+
+            setTimeout(() => {
+                if (sim.battle.monHp <= 0) {
+                    // ชนะการต่อสู้
+                    sim.state = 'idle';
+                    player.gold += mon.gold;
+                    addLog(`🏆 เอาชนะ ${mon.name} สำเร็จ! ได้รับเงิน +${mon.gold} G`, 'text-emerald-400 font-bold');
+                    gainExp(mon.exp);
+                    sim.battle.busy = false;
+                    setTimeout(() => switchScene('base'), 900);
+                    return;
+                }
+
+                // เทิร์นมอนสเตอร์โจมตีสวนกลับ (ดาเมจขั้นต่ำ 1)
+                sim.state = 'hurt';
+                sim.frame = 0;
+                const dmgToMint = Math.max(1, mon.atk - stats.def);
+                player.hp = Math.max(0, player.hp - dmgToMint);
+                addLog(`${mon.name} โจมตีสวนกลับ! มิ้นเสีย HP -${dmgToMint}`, 'text-rose-400');
+                updateUI();
+
+                setTimeout(() => {
+                    sim.state = 'idle';
+                    sim.battle.busy = false;
+                    if (player.hp <= 0) {
+                        addLog('💫 มิ้นหมดแรงจากการต่อสู้! ถูกพากลับฐานที่มั่น', 'text-rose-500 font-bold');
+                        showToast('หมดแรง! กลับมาพักฟื้นที่ฐานที่มั่นนะ');
+                        switchScene('base');
+                    }
+                }, 450);
+            }, 500);
+        }
+
+        // --- ระบบปัดป้องสาวๆ ที่มาแกล้งจั๊กจี้ขณะโหนบาร์ ---
+        function resistTickle() {
+            if (!sim.prankster.tickling) return;
+            sim.prankster.resistCount += 1;
+            if (sim.prankster.resistCount >= 4) {
+                sim.prankster.active = false;
+                sim.prankster.tickling = false;
+                sim.state = 'hang';
+                document.getElementById('tickleAlertBox').classList.add('hidden');
+                addLog('😅 มิ้นสลัดตัวหลุดจากการโดนจั๊กจี้ได้ทันเวลา!', 'text-emerald-300');
+            }
+        }
+
+        // วาดตัวละคร NPC สาวจอมแกล้ง (ผมสั้นสีน้ำตาล เสื้อยืดชมพู)
+        function drawPranksterGirl(x, y, scale, isTickling) {
+            ctx.save();
+            const px = (dx, dy, w, h, color) => {
+                ctx.fillStyle = color;
+                ctx.fillRect(Math.round(x + dx * scale), Math.round(y + dy * scale), Math.round(w * scale), Math.round(h * scale));
+            };
+            // ผมสั้นสีน้ำตาลเข้ม
+            px(6, 2, 12, 10, '#451a03');
+            // ใบหน้ายิ้มเจ้าเล่ห์
+            px(7, 5, 10, 8, '#fed7aa');
+            px(9, 8, 2, 2, '#0f172a');
+            px(13, 8, 2, 2, '#0f172a');
+            px(10, 11, 4, 1, '#e11d48');
+            // เสื้อสีชมพู + กางเกงขาสั้น
+            px(7, 14, 10, 11, '#ec4899');
+            px(7, 25, 10, 6, '#1e293b');
+            // ขา
+            px(8, 31, 3, 11, '#fed7aa');
+            px(13, 31, 3, 11, '#fed7aa');
+            // แขนยื่นขึ้นไปจั๊กจี้
+            if (isTickling) {
+                const wiggle = Math.sin(Date.now() / 60) * 2;
+                px(16, 4 + wiggle, 6, 3, '#fed7aa');
+            } else {
+                px(15, 15, 3, 9, '#fed7aa');
+            }
+            ctx.restore();
+        }
+
+        // --- ลูปอัปเดตและวาดฉากเกมหลัก ---
+        let lastFrameTime = performance.now();
+
+        function gameLoop(now) {
+            const dt = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+
+            if (canvas.width === 0) resizeGameCanvas();
+            const w = canvas.width, h = canvas.height;
+            const scale = 2.6;
+            const charW = 64 * scale, charH = 79 * scale;
+            const groundY = h - 46;
+            const floorY = groundY - charH;
+
+            ctx.clearRect(0, 0, w, h);
+
+            if (sim.scene === 'base') {
+                // ฉากฐานที่มั่นอบอุ่น
+                const grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#1e1b4b');
+                grad.addColorStop(1, '#0f172a');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+
+                // พื้นหินฐานที่มั่น
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(0, groundY, w, h - groundY);
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(0, groundY, w, 4);
+
+                // กองไฟ & เต็นท์พิกเซล
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(w * 0.65, groundY - 8, 28, 8);
+                ctx.fillStyle = '#f97316';
+                ctx.fillRect(w * 0.65 + 6, groundY - 22 + Math.sin(now / 120) * 3, 16, 14);
+                ctx.fillStyle = '#fde047';
+                ctx.fillRect(w * 0.65 + 10, groundY - 16, 8, 8);
+
+                sim.mintY = floorY;
+                drawMint(ctx, sim.mintX, sim.mintY, scale, 'idle', sim.frame, false);
+
+            } else if (sim.scene === 'gym') {
+                // ฉากลานออกกำลังกาย + บาร์สูง
+                const grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#0369a1');
+                grad.addColorStop(1, '#0f172a');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+
+                const barY = Math.max(42, groundY - charH - 34);
+                const barStartX = w * 0.2, barEndX = w * 0.8;
+
+                // เสาและราวบาร์สูง
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(barStartX - 4, barY, 8, groundY - barY);
+                ctx.fillRect(barEndX - 4, barY, 8, groundY - barY);
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillRect(barStartX, barY, barEndX - barStartX, 5);
+
+                // พื้นหญ้า
+                ctx.fillStyle = '#16a34a';
+                ctx.fillRect(0, groundY, w, h - groundY);
+
+                if (sim.grabCooldown > 0) sim.grabCooldown--;
+
+                if (sim.isHanging) {
+                    sim.vy = 0;
+                    sim.mintY = barY - (1 * scale);
+
+                    // ลดพลังงานวินาทีละ 1 หน่วย + สะสมเวลาโหน 20 วินาที = 1 EXP
+                    player.energy = Math.max(0, player.energy - dt);
+                    sim.hangSeconds += dt;
+                    document.getElementById('gymHangTimer').textContent = sim.hangSeconds.toFixed(1);
+
+                    if (sim.hangSeconds >= 20) {
+                        sim.hangSeconds -= 20;
+                        gainExp(1);
+                    }
+
+                    // หมดพลังงาน -> ร่วงจากบาร์
+                    if (player.energy <= 0) {
+                        sim.isHanging = false;
+                        sim.prankster.active = false;
+                        sim.prankster.tickling = false;
+                        document.getElementById('tickleAlertBox').classList.add('hidden');
+                        sim.grabCooldown = 40;
+                        addLog('⚡ พลังงานหมดแล้ว! มิ้นร่วงลงมาจากบาร์สูง', 'text-rose-400');
+                    }
+
+                    // สุ่มสาวๆ แอบเดินมาแกล้งจั๊กจี้ที่รักแร้
+                    if (!sim.prankster.active && sim.isHanging && Math.random() < 0.004) {
+                        sim.prankster.active = true;
+                        sim.prankster.tickling = false;
+                        sim.prankster.x = sim.mintX > w / 2 ? barStartX - 20 : barEndX + 20;
+                        addLog('👀 มีสาวคนอื่นกำลังเดินย่องเข้ามาใกล้ราวบาร์!', 'text-pink-300');
+                    }
+
+                    if (sim.prankster.active) {
+                        const targetX = sim.mintX + charW * 0.2;
+                        if (!sim.prankster.tickling) {
+                            sim.prankster.x += (targetX > sim.prankster.x ? 1.8 : -1.8);
+                            if (Math.abs(sim.prankster.x - targetX) < 18) {
+                                sim.prankster.tickling = true;
+                                sim.prankster.resistCount = 0;
+                                sim.prankster.tickleTimer = 3.2; // มีเวลา 3.2 วินาทีในการปัดออก
+                                document.getElementById('tickleAlertBox').classList.remove('hidden');
+                            }
+                        } else {
+                            sim.prankster.tickleTimer -= dt;
+                            sim.state = 'tickleFeather'; // ใช้ท่าโหนโดนจั๊กจี้พร้อมขนนกที่รักแร้!
+                            if (sim.prankster.tickleTimer <= 0) {
+                                // สลัดไม่ทัน -> หัวเราะจนหมดแรงร่วงจากบาร์!
+                                sim.isHanging = false;
+                                sim.prankster.active = false;
+                                sim.prankster.tickling = false;
+                                sim.grabCooldown = 50;
+                                document.getElementById('tickleAlertBox').classList.add('hidden');
+                                addLog('🤣 โดนจั๊กจี้จั๊กกะแร้จนหัวเราะหมดแรง ร่วงลงจากบาร์!', 'text-pink-400 font-bold');
+                            }
+                        }
+                        drawPranksterGirl(sim.prankster.x, groundY - 42 * 2.4, 2.4, sim.prankster.tickling);
+                    }
+
+                    // ควบคุมขณะโหนบาร์ (ถ้าไม่โดนจั๊กจี้อยู่)
+                    if (!sim.prankster.tickling) {
+                        if (sim.keys.left) { sim.mintX -= 2.4; sim.flip = true; sim.state = 'climb'; }
+                        else if (sim.keys.right) { sim.mintX += 2.4; sim.flip = false; sim.state = 'climb'; }
+                        else { sim.state = 'hang'; }
+
+                        if (sim.keys.down) {
+                            sim.isHanging = false;
+                            sim.grabCooldown = 25;
+                            sim.prankster.active = false;
+                        }
+                    }
+
+                    sim.mintX = Math.max(barStartX - 20, Math.min(barEndX - charW + 20, sim.mintX));
+                    updateUI();
+
+                } else {
+                    // อยู่บนพื้นหรือกำลังกระโดดในลานออกกำลังกาย
+                    if (sim.keys.left) { sim.mintX -= 3.8; sim.flip = true; }
+                    if (sim.keys.right) { sim.mintX += 3.8; sim.flip = false; }
+                    sim.mintX = Math.max(10, Math.min(w - charW - 10, sim.mintX));
+
+                    if (sim.keys.up && sim.isGrounded) {
+                        if (player.energy < 2) {
+                            showToast('⚡ พลังงานเหลือน้อยเกินไปที่จะโหนบาร์!');
+                        } else {
+                            sim.vy = -12.5;
+                            sim.isGrounded = false;
+                        }
+                    }
+
+                    sim.mintY += sim.vy;
+                    if (sim.mintY < floorY) {
+                        sim.vy += 0.58;
+                        sim.isGrounded = false;
+                    } else {
+                        sim.mintY = floorY;
+                        sim.vy = 0;
+                        sim.isGrounded = true;
+                    }
+
+                    // ตรวจจับการคว้าบาร์สูง
+                    const centerX = sim.mintX + charW / 2;
+                    if (!sim.isGrounded && sim.grabCooldown === 0 && player.energy >= 2) {
+                        if (centerX >= barStartX && centerX <= barEndX && Math.abs(sim.mintY - barY) <= 22) {
+                            sim.isHanging = true;
+                            sim.vy = 0;
+                        }
+                    }
+
+                    if (!sim.isGrounded) sim.state = 'jump';
+                    else if (sim.keys.left || sim.keys.right) sim.state = 'walk';
+                    else sim.state = 'idle';
+                }
+
+                drawMint(ctx, sim.mintX, sim.mintY, scale, sim.state, sim.frame, sim.flip);
+
+            } else if (sim.scene === 'hunt') {
+                // ฉากต่อสู้ป่าล่าสัตว์ RPG
+                const grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#064e3b');
+                grad.addColorStop(1, '#022c22');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+
+                ctx.fillStyle = '#14532d';
+                ctx.fillRect(0, groundY, w, h - groundY);
+
+                // วาดมิ้นฝั่งซ้าย
+                sim.mintY = floorY;
+                drawMint(ctx, sim.mintX, sim.mintY, scale, sim.state, sim.frame, false);
+
+                // วาดมอนสเตอร์ฝั่งขวา
+                if (sim.battle.monster && sim.battle.monHp > 0) {
+                    const monX = w * 0.65 + (sim.battle.monHitAnim > 0 ? Math.sin(now / 25) * 6 : 0);
+                    const monY = groundY - 64;
+                    if (sim.battle.monHitAnim > 0) sim.battle.monHitAnim--;
+
+                    ctx.fillStyle = sim.battle.monHitAnim > 0 ? '#ffffff' : sim.battle.monster.color;
+                    ctx.beginPath();
+                    ctx.roundRect(monX, monY, 72, 64, 18);
+                    ctx.fill();
+                    // ตาและเขี้ยวมอนสเตอร์
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(monX + 14, monY + 20, 10, 10);
+                    ctx.fillRect(monX + 44, monY + 20, 10, 10);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillRect(monX + 16, monY + 22, 5, 5);
+                    ctx.fillRect(monX + 46, monY + 22, 5, 5);
+                }
+            }
+
+            // อัปเดตเฟรมตัวละคร
+            sim.tick++;
+            const delay = ['tickleFeather', 'attack', 'hurt'].includes(sim.state) ? 8 : 14;
+            if (sim.tick >= delay) {
+                sim.tick = 0;
+                sim.frame++;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // คีย์บอร์ด & ปุ่มสัมผัส
+        window.addEventListener('keydown', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') sim.keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd') sim.keys.right = true;
+            if (e.key === 'ArrowUp' || e.key === 'w') { e.preventDefault(); sim.keys.up = true; }
+            if (e.key === 'ArrowDown' || e.key === 's') { e.preventDefault(); sim.keys.down = true; }
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (sim.prankster.tickling) resistTickle();
+                else sim.keys.up = true;
+            }
+        });
+        window.addEventListener('keyup', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') sim.keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd') sim.keys.right = false;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') sim.keys.up = false;
+            if (e.key === 'ArrowDown' || e.key === 's') sim.keys.down = false;
+        });
+
+        function bindMobile(id, key) {
+            const el = document.getElementById(id);
+            el.addEventListener('touchstart', e => { e.preventDefault(); sim.keys[key] = true; });
+            el.addEventListener('touchend', e => { e.preventDefault(); sim.keys[key] = false; });
+        }
+        bindMobile('mLeft', 'left');
+        bindMobile('mRight', 'right');
+        bindMobile('mJump', 'up');
+        bindMobile('mDown', 'down');
+
+        /**
+         * ============================================================================
+         * 4. ระบบเซฟและโหลดข้อมูลผ่าน GOOGLE SHEETS
+         * ============================================================================
+         */
+        function openSheetModal() {
+            document.getElementById('inputPlayerId').value = sheetConfig.playerId;
+            document.getElementById('inputSheetUrl').value = sheetConfig.url;
+            document.getElementById('sheetModal').classList.remove('hidden');
+        }
+
+        function closeSheetModal() {
+            document.getElementById('sheetModal').classList.add('hidden');
+        }
+
+        function saveSheetConfig() {
+            sheetConfig.playerId = document.getElementById('inputPlayerId').value.trim() || 'MINT_01';
+            sheetConfig.url = document.getElementById('inputSheetUrl').value.trim();
+            localStorage.setItem('mint_player_id', sheetConfig.playerId);
+            localStorage.setItem('mint_sheet_url', sheetConfig.url);
+            closeSheetModal();
+            showToast('บันทึกการตั้งค่า Google Sheets เรียบร้อยแล้ว!');
+        }
+
+        function enterMainGame() {
+            document.getElementById('titleScreen').classList.add('hidden');
+            document.getElementById('mainGame').classList.remove('hidden');
+            resizeGameCanvas();
+            switchScene('base');
+            updateUI();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startNewGame() {
+            player = {
+                playerId: sheetConfig.playerId,
+                name: 'มิ้น',
+                level: 1, exp: 0, maxExp: 10, statPoints: 0,
+                baseMaxHp: 10, baseAtk: 1, baseDef: 1,
+                hp: 10, energy: 100, maxEnergy: 100,
+                gold: 0, inventory: [], lastUpdate: Date.now()
+            };
+            enterMainGame();
+            addLog('เริ่มต้นการผจญภัยครั้งใหม่ของมิ้น!', 'text-emerald-300');
+        }
+
+        async function saveToSheets() {
+            // บันทึกสำรองลงเครื่องเสมอ
+            localStorage.setItem('mint_local_save_' + sheetConfig.playerId, JSON.stringify(player));
+
+            if (!sheetConfig.url) {
+                showToast('💾 บันทึกลงเครื่องแล้ว (ใส่ลิงก์ Sheets ใน ⚙️ เพื่อเซฟขึ้นคลาวด์)');
+                return;
+            }
+
+            const btn = document.getElementById('btnSaveCloud');
+            btn.disabled = true;
+            btn.textContent = '⏳ กำลังบันทึก...';
+
+            try {
+                const payload = {
+                    save: {
+                        name: player.name,
+                        level: player.level,
+                        exp: player.exp,
+                        maxExp: player.maxExp,
+                        statPoints: player.statPoints,
+                        hp: Math.ceil(player.hp),
+                        maxHp: player.baseMaxHp,
+                        atk: player.baseAtk,
+                        def: player.baseDef,
+                        energy: Math.floor(player.energy),
+                        maxEnergy: player.maxEnergy,
+                        gold: player.gold,
+                        inventory: player.inventory
+                    }
+                };
+
+                await fetch(`${sheetConfig.url}?action=save&playerId=${encodeURIComponent(sheetConfig.playerId)}`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                showToast('☁️ บันทึกค่าพลังของมิ้นลง Google Sheets สำเร็จ!');
+                addLog('บันทึกข้อมูลลง Google Sheets เรียบร้อยแล้ว', 'text-blue-300');
+            } catch (err) {
+                showToast('❌ บันทึกลงชีตไม่สำเร็จ กรุณาตรวจสอบลิงก์ Web App');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '☁️ บันทึกลงชีต';
+            }
+        }
+
+        async function loadFromSheets() {
+            const statusEl = document.getElementById('titleStatusText');
+
+            if (!sheetConfig.url) {
+                // ลองโหลดจาก LocalStorage หากยังไม่ใส่ลิงก์ Sheets
+                const local = localStorage.getItem('mint_local_save_' + sheetConfig.playerId);
+                if (local) {
+                    player = JSON.parse(local);
+                    enterMainGame();
+                    showToast('โหลดเซฟสำรองในเครื่องสำเร็จ!');
+                } else {
+                    statusEl.textContent = '⚠️ กรุณากดปุ่ม ⚙️ ด้านบนขวาเพื่อใส่ลิงก์ Google Sheets ก่อนโหลดเซฟค่ะ';
+                }
+                return;
+            }
+
+            statusEl.textContent = '⏳ กำลังเชื่อมต่อ Google Sheets เพื่อโหลดค่าพลังของมิ้น...';
+            try {
+                const res = await fetch(`${sheetConfig.url}?action=load&playerId=${encodeURIComponent(sheetConfig.playerId)}`);
+                const data = await res.json();
+
+                if (data.status === 'found' && data.save) {
+                    const s = data.save;
+                    player.level = s.level;
+                    player.exp = s.exp;
+                    player.maxExp = s.maxExp;
+                    player.statPoints = s.statPoints;
+                    player.baseMaxHp = s.maxHp;
+                    player.baseAtk = s.atk;
+                    player.baseDef = s.def;
+                    player.hp = s.hp;
+                    player.maxEnergy = s.maxEnergy;
+                    player.gold = s.gold;
+                    player.inventory = s.inventory || [];
+
+                    // คำนวณพลังงานที่ฟื้นฟูระหว่างออฟไลน์ตามเวลาจริง
+                    const elapsedMins = Math.max(0, (Date.now() - (s.lastUpdate || Date.now())) / 60000);
+                    const regenRate = 2 + (player.level * 0.1);
+                    const recovered = Math.floor(elapsedMins * regenRate);
+                    player.energy = Math.min(player.maxEnergy, s.energy + recovered);
+
+                    enterMainGame();
+                    showToast(`☁️ โหลดเซฟมิ้น Lv.${player.level} สำเร็จ! (ฟื้นพลังงาน +${recovered})`);
+                } else {
+                    statusEl.textContent = 'ไม่พบข้อมูลเซฟของรหัสนี้ กด "เริ่มผจญภัยใหม่" แล้วกดบันทึกลงชีตได้เลยค่ะ';
+                }
+            } catch (err) {
+                statusEl.textContent = '❌ เชื่อมต่อ Google Sheets ไม่สำเร็จ กรุณาตรวจสอบลิงก์และสิทธิ์เข้าถึง (Anyone)';
+            }
+        }
+    </script>
+</body>
+</html>
